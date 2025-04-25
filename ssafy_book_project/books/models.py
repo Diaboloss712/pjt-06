@@ -3,6 +3,13 @@ from accounts.models import User
 from django.conf import settings
 
 
+class Category(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Book(models.Model):
     title = models.CharField(max_length=20)
     description = models.TextField()
@@ -14,6 +21,12 @@ class Book(models.Model):
     cover_image = models.ImageField(blank=True)
     audio_file = models.FileField(upload_to="tts/", blank=True, null=True)
     user_id = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
+    
+    # Category와의 관계 추가 (ForeignKey)
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, null=True, blank=True)
+
+    def __str__(self):
+        return self.title
 
 
 class Thread(models.Model):
