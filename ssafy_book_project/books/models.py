@@ -15,6 +15,7 @@ class Book(models.Model):
     audio_file = models.FileField(upload_to="tts/", blank=True, null=True)
     user_id = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
 
+
 class Thread(models.Model):
     book_id = models.ForeignKey(Book, related_name='threads', on_delete=models.CASCADE)
     title = models.CharField(max_length=20)
@@ -27,4 +28,8 @@ class Thread(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, related_name='threads')
 
 
-    
+class Comment(models.Model):
+    thread_id = models.ForeignKey(Thread, related_name='comments', on_delete=models.CASCADE)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
