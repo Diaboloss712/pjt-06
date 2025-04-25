@@ -2,6 +2,11 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from .models import Book, Thread
 from accounts.models import User
+from .serializers import ThreadListSerializer, ThreadSerializer, CommentSerializer
+from django.db.models import Count
+from rest_framework.response import Response
+from rest_framework.decorators import api_view
+from rest_framework import status
 from .forms import ThreadForm, BookForm
 from .utils import (
     process_wikipedia_info,
@@ -92,64 +97,42 @@ def delete(request, pk):
 @login_required
 def thread_create(request, pk):
     if request.method == "POST":
-        form = ThreadForm(request.POST, request.FILES)
-        if form.is_valid():
-            thread = form.save(commit=False)
-            thread.book_id = Book.objects.get(pk=pk)  # 인스턴스 할당!
-            thread.user_id = request.user.id        # 숫자(ID) 할당!
-            thread.save()
-            return redirect("books:detail", pk)
-    else:
-        form = ThreadForm()
-    context = {"form": form}
-    return render(request, "threads/create.html", context)
+        serializer = ThreadSerializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            book = Book.objects.get(pk=pk)
+            user = request.user.id        # 숫자(ID) 할당!
+            serializer.save(book = book, user = user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 def thread_detail(request, pk, thread_pk):
     book = Book.objects.get(pk=pk)
     thread = Thread.objects.get(pk=thread_pk)
-    is_liked = False
-    if request.user.is_authenticated:
-        is_liked = thread.likes.filter(id=request.user.id).exists()
-    context = {
-        'thread': thread,
-        'book': book,
-        'is_liked': is_liked,
-        'total_likes': thread.likes.count(),
-        'user': request.user,
-    }
-    return render(request, "threads/detail.html", context)
-    
+    thread = Thread.objects.annotate(num_of_comments=Count('comment')).get(pk=thread.pk)
+    serializer = ThreadSerializer(thread)
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
 @login_required
 def thread_update(request, pk, thread_pk):
     thread = Thread.objects.get(pk=thread_pk)
     book = Book.objects.get(pk=pk)  # book 객체 가져오기
-
     if request.user != thread.user:
-        return redirect('books:thread_detail', pk, thread_pk)
+        return Response(status=status.HTTP_400_BAD_REQUEST)
     if request.method == "POST":
-        form = ThreadForm(request.POST, request.FILES, instance=thread)
-        if form.is_valid():
-            form.save()
-            return redirect("books:thread_detail", pk, thread_pk)
-    else:
-        form = ThreadForm(instance=thread)
-    context = {
-        "form": form,
-        "thread": thread,
-        "book": book,  # 반드시 추가!
-    }
-    return render(request, "threads/update.html", context)
-
+        serializer = ThreadSerializer(instance = thread, data=request.data, partial = True)
+        # form = ThreadForm(request.POST, request.FILES, instance=thread)
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @login_required
 def thread_delete(request, pk, thread_pk):  # pk 매개변수 추가
     thread = get_object_or_404(Thread, pk=thread_pk)
     if request.user == thread.user:
         thread.delete()
-    return redirect('books:detail', pk=pk)  # Thread가 아닌 Book 상세 페이지로 리디렉션
-
-
+        return Response(status=status.HTTP_200_OK)
+    return Response(status=status.HTTP_400_BAD_REQUEST)
 
 @login_required
 def thread_like(request, pk, thread_pk):
@@ -158,4 +141,4 @@ def thread_like(request, pk, thread_pk):
         thread.likes.remove(request.user)
     else:
         thread.likes.add(request.user)
-    return redirect('books:thread_detail', pk=pk, thread_pk=thread_pk)
+    return Response(status=status.HTTP_200_OK)
