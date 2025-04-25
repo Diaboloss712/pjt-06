@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <h1>도서 상세 페이지</h1>
+
+  {% if book.cover_image %}
+    <div style="width: 300px;">
+      <img src="{{ book.cover_image.url }}" alt="" class="w-100">
+    </div>
+  {% endif %}
+
+  <h2>{{ book.title }}</h2>
+  <p>{{ book.description }}</p>
+  <h5>회원 리뷰 평점 : {{ book.customer_review_rank }} / 10</h5>
+
+  <hr>
+
+  <div style="display: flex; justify-content: center; align-items: center; gap: 2rem; margin-bottom: 2rem;">
+    {% if book.author_profile_img %}
+      <div style="width: 120px; height: 120px;">
+        <img 
+          src="{{ book.author_profile_img.url }}" 
+          alt="{{ book.author }}" 
+          style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;"
+        >
+      </div>
+    {% endif %}
+    <div style="flex: 1;">
+      <h3>{{ book.author }}</h3>
+      <p><strong>대표작:</strong> {{ book.author_works }}</p>
+      <p>{{ book.author_info }}</p>
+      <small style="color: #888;">
+        ※ 작가 대표작과 작가 정보는 AI가 생성한 답변으로, 정확하지 않을 수 있습니다.
+      </small>
+    </div>
+  </div>
+
+  <hr>
+
+  {% if book.audio_file %}
+    <h5>도서 정보 음성 듣기:</h5>
+    <audio controls>
+      <source src="{{ book.audio_file.url }}" type="audio/mpeg">
+    </audio>
+  {% else %}
+    <p>음성 파일이 없습니다.</p>
+  {% endif %}
+
+  <hr>
+
+  <a href="{% url 'books:update' book.pk %}" class="btn btn-secondary">UPDATE</a>
+  <form action="{% url 'books:delete' book.pk %}" method="POST" class="d-inline">
+    {% csrf_token %}
+    <input type="submit" value="DELETE" class="btn btn-danger">
+  </form>
+
+  <hr>
+
+  <!-- Thread 작성 폼: BACK 버튼 위에 위치 -->
+  <div style="margin-bottom: 2rem;">
+    <h2>Thread 작성</h2>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <div>
+        {{ form.title.label_tag }} {{ form.title }}
+        {{ form.title.errors }}
+      </div>
+      <div>
+        {{ form.content.label_tag }} {{ form.content }}
+        {{ form.content.errors }}
+      </div>
+      <div>
+        {{ form.reading_date.label_tag }}
+        {{ form.reading_date }}
+        {{ form.reading_date.errors }}
+        <small class="form-text text-muted">YYYY-MM-DD 형식(예: 2025-02-18)으로 입력하세요.</small>
+      </div>
+      {% if form.cover_img %}
+        <div>
+          {{ form.cover_img.label_tag }} {{ form.cover_img }}
+          {{ form.cover_img.errors }}
+        </div>
+      {% endif %}
+      <button type="submit" class="btn btn-primary">작성</button>
+    </form>
+  </div>
+
+  <!-- Thread 목록 -->
+  <div style="margin-bottom: 2rem;">
+    <h2>Thread</h2>
+    {% if threads %}
+      {% for thread in threads %}
+        <div style="border-bottom: 1px solid #eee; margin-bottom: 1rem;">
+          <a href="{% url 'books:thread_detail' book.pk thread.pk %}">
+            <strong>{{ thread.title }}</strong>
+          </a><br>
+          {{ thread.content }}<br>
+          {{ thread.reading_date }}<br>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p>게시글이 없습니다.</p>
+    {% endif %}
+  </div>
+
+  <div>
+    <a href="{% url 'books:index' %}" class="btn btn-primary">BACK</a>
+  </div>
+{% endblock content %}

@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <h1>{{ thread.title }}</h1>
+
+  <p>
+    도서: <a href="{% url 'books:detail' book.pk %}">{{ book.title }}</a>
+    작성자: {{ thread.user.username }}
+    독서일: {{ thread.reading_date }}
+  </p>
+
+  {% if thread.cover_img %}
+    <div style="width: 400px; margin-bottom: 1rem;">
+      <img src="{{ thread.cover_img.url }}" alt="" style="width: 100%;">
+    </div>
+  {% endif %}
+
+  <div style="margin-bottom: 1rem;">
+    {{ thread.content|linebreaksbr }}
+  </div>
+
+  <!-- 좋아요/좋아요 취소 버튼 및 개수 -->
+  <div style="margin-bottom: 1rem;">
+    <form action="{% url 'books:thread_like' book.pk thread.pk %}" method="POST" style="display: inline;">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-danger">
+        {% if is_liked %}좋아요 취소{% else %}좋아요{% endif %}
+      </button>
+      <span>{{ total_likes }} 좋아요</span>
+    </form>
+  </div>
+
+  <!-- 수정/삭제 버튼: 작성자에게만 보임 -->
+  {% if user == thread.user %}
+    <a href="{% url 'books:thread_update' book.pk thread.pk %}" class="btn btn-primary">수정</a>
+    <form action="{% url 'books:thread_delete' book.pk thread.pk %}" method="POST" style="display: inline;">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger">삭제</button>
+    </form>
+  {% endif %}
+
+  <a href="{% url 'books:detail' book.pk %}" class="btn btn-secondary">BACK</a>
+{% endblock %}

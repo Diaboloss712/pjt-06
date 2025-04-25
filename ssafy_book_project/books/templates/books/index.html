@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <h1>메인 페이지</h1>
+  <div class="row row-cols-1 row-cols-md-3 g-4 mt-4">
+    {% for book in books %}
+    <div class="col">
+      <div class="card book-card h-100">
+        {% if book.cover_image %}
+          <img
+            src="{{ book.cover_image.url }}"            
+            class="card-img-top"
+            alt="..."
+          />
+        {% endif %}
+        <div class="card-body">
+          <h5 class="card-title">
+            {{ book.title }}
+          </h5>
+          <p class="card-text">
+            {{ book.description }}
+          </p>
+          <h6 class="card-subtitle mb-2">
+            <a href="{% url 'books:detail' book.pk %}" class="btn btn-primary">Detail</a>
+          </h6>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+{% endblock content %}
