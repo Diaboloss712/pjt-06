@@ -2,12 +2,11 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from .models import Book, Thread, Category, Comment
 from accounts.models import User
-from .serializers import ThreadListSerializer, ThreadSerializer, CommentSerializer, BookSerializer, CategorySerializer
+from .serializers import ThreadListSerializer, ThreadSerializer, CommentSerializer, BookSerializer, CategorySerializer, BookListSerializer
 from django.db.models import Count
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework import status
-from .forms import ThreadForm, BookForm
 from .utils import (
     process_wikipedia_info,
     generate_author_gpt_info,
@@ -18,81 +17,41 @@ from .utils import (
 @api_view(['GET'])
 def index(request):
     books = Book.objects.all()
-    context = {
-        "books": books,
-    }
-    return render(request, "books/index.html", context)
+    serializer = BookListSerializer(books, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
 @login_required
 def create(request):
-    if request.method == "POST":
-        form = BookForm(request.POST, request.FILES)
-        if form.is_valid():
-            book = form.save(commit=False)
-            book.user = request.user
-            book.save()
+    serializer = BookSerializer(data=request.data)
+    if serializer.is_valid(raise_exception=True):
+        serializer.save(user = request.user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-            serializer = BookSerializer(book)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-          
-    else:
-        form = BookForm()
-    context = {"form": form}
-    return render(request, "books/create.html", context)
-
-@api_view(['GET','POST'])
+@api_view(['GET'])
 def detail(request, book_pk):
-    book = Book.objects.get(pk=book_pk)
-    threads = Thread.objects.filter(book_id=book)
-
-    if request.method == "POST":
-        form = ThreadForm(request.POST, request.FILES)
-        if form.is_valid():
-            thread = form.save(commit=False)
-            thread.book_id = book         
-            thread.user_id = request.user.id  
-            thread.save()
-            return redirect("books:detail", pk=book.id)
-    else:
-        form = ThreadForm()
-    
+    book = get_object_or_404(Book, pk=book_pk)
     book_serializer = BookSerializer(book)
-    thread_serializer = ThreadListSerializer(threads, many=True)
-
-    context = {
-        "book": book_serializer.data,
-        "threads": thread_serializer.data,
-        "form": form,
-    }
-    return render(request, "books/detail.html", context)
+    return Response(book_serializer.data, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
 @login_required
 def update(request, book_pk):
     book = Book.objects.get(pk=book_pk)
-    if request.user != book.user:  # user_id → user로 수정
-        return redirect('books:detail', book_pk)
-    if request.method == "POST":
-        form = BookForm(request.POST, request.FILES, instance=book)
-        if form.is_valid():
-            form.save()
-            return redirect("books:detail", book_pk)
-    else:
-        form = BookForm(instance=book)
-    context = {
-        "form": form,
-        "book": book,
-    }
-    return render(request, "books/update.html", context)
+    if request.user != book.user:
+        return Response(status=status.HTTP_400_BAD_REQUEST)
+    serializer = BookSerializer(instance = book, data=request.data, partial = True)
+    if serializer.is_valid(raise_exception=True):
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 @api_view(['DELETE'])
 @login_required
 def delete(request, book_pk):
-    book = Book.objects.get(pk=book_pk)
+    book = get_object_or_404(Book, pk=book_pk)
     if request.user == book.user:  
         book.delete()
-    return redirect("books:index")
+    return Response(status=status.HTTP_200_OK)
 
 # 전체 쓰레드 목록
 @api_view(['GET'])

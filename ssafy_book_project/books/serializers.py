@@ -70,3 +70,7 @@ class BookSerializer(serializers.ModelSerializer):
             'audio_file', 'user_id', 'isbn', 'category'
         ]
 
+class BookListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Book
+        fields = ('id', 'title', 'author', 'isbn', 'cover_image',)
