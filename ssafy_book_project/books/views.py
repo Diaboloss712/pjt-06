@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from .models import Book, Thread
 from accounts.models import User
-from .serializers import ThreadListSerializer, ThreadSerializer, CommentSerializer
+from .serializers import ThreadListSerializer, ThreadSerializer, CommentSerializer, BookSerializer, CategorySerializer
 from django.db.models import Count
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
@@ -29,21 +29,12 @@ def create(request):
         form = BookForm(request.POST, request.FILES)
         if form.is_valid():
             book = form.save(commit=False)
-
-            wiki_summary = process_wikipedia_info(book)
-            author_info, author_works = generate_author_gpt_info(book, wiki_summary)
-            book.author_info = author_info
-            book.author_works = author_works
             book.user = request.user
             book.save()
 
-            audio_script = generate_audio_script(book, wiki_summary)
-            audio_file_path = create_tts_audio(book, audio_script)
-            if audio_file_path:
-                book.audio_file = audio_file_path
-                book.save()
-
-            return redirect("books:detail", book.pk)
+            serializer = BookSerializer(book)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+          
     else:
         form = BookForm()
     context = {"form": form}
@@ -51,23 +42,29 @@ def create(request):
 
 def detail(request, pk):
     book = Book.objects.get(pk=pk)
-    threads = Thread.objects.filter(book_id=book)  # 인스턴스로 필터링
+    threads = Thread.objects.filter(book_id=book)  
+
     if request.method == "POST":
         form = ThreadForm(request.POST, request.FILES)
         if form.is_valid():
             thread = form.save(commit=False)
-            thread.book_id = book           # 인스턴스 할당!
-            thread.user_id = request.user.id  # 숫자(ID) 할당!
+            thread.book_id = book         
+            thread.user_id = request.user.id  
             thread.save()
             return redirect("books:detail", pk=book.id)
     else:
         form = ThreadForm()
+    
+    book_serializer = BookSerializer(book)
+    thread_serializer = ThreadListSerializer(threads, many=True)
+
     context = {
-        "book": book,
-        "threads": threads,
+        "book": book_serializer.data,
+        "threads": thread_serializer.data,
         "form": form,
     }
     return render(request, "books/detail.html", context)
+
 
 @login_required
 def update(request, pk):
@@ -90,9 +87,10 @@ def update(request, pk):
 @login_required
 def delete(request, pk):
     book = Book.objects.get(pk=pk)
-    if request.user == book.user:  # user_id → user로 수정
+    if request.user == book.user:  
         book.delete()
     return redirect("books:index")
+
 
 @login_required
 def thread_create(request, pk):
@@ -100,10 +98,12 @@ def thread_create(request, pk):
         serializer = ThreadSerializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
             book = Book.objects.get(pk=pk)
-            user = request.user.id        # 숫자(ID) 할당!
-            serializer.save(book = book, user = user)
+            user = request.user.id  
+            serializer.save(book=book, user=user)  
             return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 
 def thread_detail(request, pk, thread_pk):
     book = Book.objects.get(pk=pk)
@@ -115,9 +115,12 @@ def thread_detail(request, pk, thread_pk):
 @login_required
 def thread_update(request, pk, thread_pk):
     thread = Thread.objects.get(pk=thread_pk)
-    book = Book.objects.get(pk=pk)  # book 객체 가져오기
+
+    #book = Book.objects.get(pk=pk)  
+
     if request.user != thread.user:
         return Response(status=status.HTTP_400_BAD_REQUEST)
+    
     if request.method == "POST":
         serializer = ThreadSerializer(instance = thread, data=request.data, partial = True)
         # form = ThreadForm(request.POST, request.FILES, instance=thread)
@@ -127,7 +130,7 @@ def thread_update(request, pk, thread_pk):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @login_required
-def thread_delete(request, pk, thread_pk):  # pk 매개변수 추가
+def thread_delete(request, pk, thread_pk):  
     thread = get_object_or_404(Thread, pk=thread_pk)
     if request.user == thread.user:
         thread.delete()
@@ -142,3 +145,18 @@ def thread_like(request, pk, thread_pk):
     else:
         thread.likes.add(request.user)
     return Response(status=status.HTTP_200_OK)
+
+
+#전체 카테고리 목록 제공
+@api_view(['GET'])
+def category_list(request):
+    categories = Category.objects.all()  
+    serializer = CategorySerializer(categories, many=True)  
+    return Response(serializer.data, status=status.HTTP_200_OK) 
+
+#전체 도서 목록 제공
+@api_view(['GET'])
+def book_list(request):
+    books = Book.objects.all()  
+    serializer = BookSerializer(books, many=True)  
+    return Response(serializer.data, status=status.HTTP_200_OK)  
