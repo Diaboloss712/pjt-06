@@ -24,14 +24,14 @@ class CommentDetailSerializer(serializers.ModelSerializer):
 class ThreadListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Thread
-        fields = ('id', 'title')
+        fields = ('id', 'title',)
     book = BookTitleSerializer(read_only=True)
 
 
 class ThreadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Thread
-        fields = ('id', 'title')
+        fields = ('id', 'title', 'book', 'comments', 'num_of_comments',)
     book = BookTitleSerializer(read_only=True)
     comments = CommentDetailSerializer(read_only=True, many=True)
 
@@ -44,7 +44,7 @@ class ThreadSerializer(serializers.ModelSerializer):
 class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
-        fields = ('id','content','created_at','updated_at',)
+        fields = ('id','content','created_at','updated_at','book',)
     book = BookTitleSerializer(read_only=True, source='thread_id.book_id')
     
 # books/serializers.py
