@@ -1,76 +1,81 @@
 from rest_framework import serializers
-from .models import Book, Thread, Comment
-
-
-class ThreadTitleSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Thread
-        fields = ('title',)
-
+from .models import Book, Thread, Category, Comment
+from drf_spectacular.utils import extend_schema_field
 
 class BookTitleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Book
         fields = ('title',)
 
+class ThreadTitleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Thread
+        fields = ('title',)
 
 class CommentDetailSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Comment
-        fields = ('id', 'content', 'created_at', 'updated_at',)
     thread = ThreadTitleSerializer(read_only=True)
 
-
-class ThreadListSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Thread
-        fields = ('id', 'title',)
-    book = BookTitleSerializer(read_only=True)
-
-
-class ThreadSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Thread
-        fields = ('id', 'title', 'book', 'comments', 'num_of_comments',)
-    book = BookTitleSerializer(read_only=True)
-    comments = CommentDetailSerializer(read_only=True, many=True)
-
-    num_of_comments = serializers.SerializerMethodField()
-
-    def get_num_of_comments(self, obj):
-        return obj.num_of_comments
-
-
-class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
-        fields = ('id','content','created_at','updated_at','book',)
-    book = BookTitleSerializer(read_only=True, source='thread_id.book_id')
-    
-# books/serializers.py
-from rest_framework import serializers
-from .models import Category, Book
+        fields = ('id', 'content', 'created_at', 'updated_at', 'thread')
 
+class ThreadListSerializer(serializers.ModelSerializer):
+    book = BookTitleSerializer(read_only=True)
+
+    class Meta:
+        model = Thread
+        fields = ('id', 'title', 'book')
+
+@extend_schema_field(serializers.IntegerField())
+class ThreadSerializer(serializers.ModelSerializer):
+    book = BookTitleSerializer(read_only=True)
+    comments = CommentDetailSerializer(many=True, read_only=True)
+    num_of_comments = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Thread
+        fields = ('id', 'title', 'content', 'book', 'comments', 'num_of_comments')
+
+    def get_num_of_comments(self, obj):
+        return getattr(obj, 'num_of_comments', obj.comments.count())
+
+class ThreadCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Thread
+        fields = ('id', 'title', 'content', 'reading_date')
+        read_only_fields = ('id',)
+
+class CommentSerializer(serializers.ModelSerializer):
+    thread = ThreadTitleSerializer(read_only=True)
+
+    class Meta:
+        model = Comment
+        fields = ('id', 'content', 'created_at', 'updated_at', 'thread')
+
+class CommentCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ('id', 'content', 'created_at')
+        read_only_fields = ('id', 'created_at')
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = ['id', 'name']  
-
-
+        fields = ('id', 'name')
 
 class BookSerializer(serializers.ModelSerializer):
-    category = CategorySerializer()  # Category를 포함한 중첩 시리얼라이저
+    category = CategorySerializer(read_only=True)
 
     class Meta:
         model = Book
-        fields = [
+        fields = (
             'id', 'title', 'description', 'customer_review_rank', 'author',
             'author_profile_img', 'author_info', 'author_works', 'cover_image',
-            'audio_file', 'user_id', 'isbn', 'category'
-        ]
+            'audio_file', 'user', 'isbn', 'category'
+        )
+        read_only_fields = ('id', 'user')
 
 class BookListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Book
-        fields = ('id', 'title', 'author', 'isbn', 'cover_image',)
+        fields = ('id', 'title', 'author', 'isbn', 'cover_image')
