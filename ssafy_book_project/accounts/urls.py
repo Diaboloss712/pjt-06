@@ -25,6 +25,4 @@ urlpatterns = [
 
     # 팔로우
     path('follow/<int:user_id>/', views.follow, name='follow'),  # <int:user_id>는 팔로우할 사용자의 ID를 URL에서 받아옴
-    
-    path('index/', views.index, name='index'),
 ]
