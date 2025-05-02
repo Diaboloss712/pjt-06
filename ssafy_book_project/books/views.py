@@ -12,6 +12,8 @@ from .utils import (
     generate_author_gpt_info,
     generate_audio_script,
     create_tts_audio,
+    get_embedding,
+    recommend_books,
 )
 
 from drf_spectacular.utils import extend_schema
@@ -23,7 +25,8 @@ from .serializers import(
     BookSerializer,
     CategorySerializer,
     BookListSerializer,
-    ThreadCreateSerializer
+    ThreadCreateSerializer,
+    RecommendedBookSerializer,
 )
 
 @extend_schema(summary="책 목록 조회", responses=BookListSerializer)
@@ -192,3 +195,26 @@ def book_list(request):
     books = Book.objects.all()
     serializer = BookSerializer(books, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+def recommend_book_list(request, book_pk):
+    try:
+        target_book = Book.objects.get(pk=book_pk)
+    except Book.DoesNotExist:
+        return Response({"detail": "해당 책을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    category_books = list(Book.objects.filter(category=target_book.category))
+    category_count = len(category_books) - 1
+
+    recommended = recommend_books(
+        target_book=target_book,
+        all_books=category_books,
+        embedding_fn=get_embedding,
+        top_k=5
+    )
+    recommended_books = [book for book, _ in recommended]
+    serializer = RecommendedBookSerializer(recommended_books, many=True)
+    return Response({
+        "message": f"같은 카테고리 내 {category_count}권 중 {len(recommended_books)}권을 추천합니다.",
+        "recommendations": serializer.data,
+    })
