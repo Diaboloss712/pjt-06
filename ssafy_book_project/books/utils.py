@@ -1,11 +1,16 @@
+import os
 import json
 import requests
 import openai
+import http.client
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
 from pathlib import Path
 from django.conf import settings
 from gtts import gTTS
 import wikipediaapi
 from pydantic import BaseModel
+from dotenv import load_dotenv
 
 
 class AuthorInfo(BaseModel):
@@ -164,3 +169,59 @@ def create_tts_audio(book, audio_script):
     except Exception as e:
         print("gTTS 음성 파일 생성 에러:", e)
         return None
+
+def get_embedding(text):
+    load_dotenv()
+
+    host = 'clovastudio.stream.ntruss.com'
+    api_key = os.getenv('CLOVA_API_KEY')
+    request_id = 'cb74c8fb916a4ebbba73c47fe99e8c83'  # UUID 추천
+
+    headers = {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Authorization': api_key,
+        'X-NCP-CLOVASTUDIO-REQUEST-ID': request_id
+    }
+
+    body = { "text": text }
+
+    conn = http.client.HTTPSConnection(host)
+    conn.request('POST', '/testapp/v1/api-tools/embedding/v2', json.dumps(body), headers)
+    response = conn.getresponse()
+    result = json.loads(response.read().decode('utf-8'))
+    conn.close()
+
+    if result['status']['code'] != '20000':
+        raise ValueError(f"Embedding API Error: {result['status']['message']}")
+
+    return np.array(result['result']['embedding'])
+
+
+def recommend_books(target_book, all_books, embedding_fn, top_k):
+    """
+    주어진 책을 기준으로 유사한 책 top_k권 추천
+    """
+    vectors = []
+    target_vec = None
+
+    for book in all_books:
+        vec = embedding_fn(book.description)
+
+        if book.pk == target_book.pk:
+            target_vec = vec
+            continue
+
+        vectors.append((book, vec))
+
+    if target_vec is None:
+        raise ValueError("target_book 벡터가 포함되어 있지 않습니다.")
+
+    similarities = []
+    for book, vec in vectors:
+        if book.pk != target_book.pk:
+            sim = cosine_similarity(target_vec.reshape(1, -1), vec.reshape(1, -1))[0][0]
+            similarities.append((book, sim))
+
+    similarities.sort(key=lambda x: x[1], reverse=True)
+    
+    return similarities[:top_k]

@@ -79,3 +79,8 @@ class BookListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Book
         fields = ('id', 'title', 'author', 'isbn', 'cover_image')
+
+class RecommendedBookSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Book
+        fields = ('title', 'description', 'category')
